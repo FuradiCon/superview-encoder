@@ -1,0 +1,102 @@
+name: macOS builds
+
+# Builds unsigned Apple Silicon + Intel .app bundles, runs the full test suite
+# and the app's --self-test on each, then attaches the zips to the release.
+# Manual runs (workflow_dispatch) keep the zips as workflow artifacts instead.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: AppleSilicon
+            ffmpeg_url: https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip
+            ffmpeg_sha: c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924
+            ffprobe_url: https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip
+            ffprobe_sha: fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6
+          - runner: macos-15-intel
+            arch: Intel
+            ffmpeg_url: https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffmpeg.zip
+            ffmpeg_sha: 7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4
+            ffprobe_url: https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffprobe.zip
+            ffprobe_sha: 2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      ASSET: Superview-Encoder-Mac-${{ matrix.arch }}.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python deps
+        run: python -m pip install -r requirements.txt
+
+      - name: Fetch ffmpeg 9.0.2 (pinned, checksummed)
+        run: |
+          mkdir -p ffmpeg
+          curl -fsSL "${{ matrix.ffmpeg_url }}" -o /tmp/ffmpeg.zip
+          curl -fsSL "${{ matrix.ffprobe_url }}" -o /tmp/ffprobe.zip
+          echo "${{ matrix.ffmpeg_sha }}  /tmp/ffmpeg.zip"  | shasum -a 256 -c -
+          echo "${{ matrix.ffprobe_sha }}  /tmp/ffprobe.zip" | shasum -a 256 -c -
+          unzip -o /tmp/ffmpeg.zip -d ffmpeg
+          unzip -o /tmp/ffprobe.zip -d ffmpeg
+          chmod +x ffmpeg/ffmpeg ffmpeg/ffprobe
+          file ffmpeg/ffmpeg
+          ffmpeg/ffmpeg -hide_banner -encoders | grep -E "hevc_videotoolbox|libx265"
+
+      - name: Tests (unit + real encodes)
+        run: python -m pytest -q
+
+      - name: Build .app
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed --onedir \
+            --name "Superview Encoder" --icon assets/icon.icns \
+            --osx-bundle-identifier com.furadicon.superview-encoder \
+            --add-data "ui:ui" --add-data "ffmpeg:ffmpeg" \
+            app.py
+
+      - name: Self-test the built app
+        run: |
+          APP="dist/Superview Encoder.app/Contents/MacOS/Superview Encoder"
+          if ! "$APP" --self-test; then
+            cat "$TMPDIR/superview-selftest.json" 2>/dev/null
+            exit 1
+          fi
+          cat "$TMPDIR/superview-selftest.json"
+
+      - name: Package
+        run: |
+          STAGE="Superview Encoder"
+          mkdir -p "$STAGE"
+          cp -R "dist/Superview Encoder.app" "$STAGE/"
+          cp dist-extras/README-mac.txt "$STAGE/README.txt"
+          cp -R dist-extras/LICENSES "$STAGE/"
+          ditto -c -k --keepParent "$STAGE" "$ASSET"
+          du -sh "$STAGE" "$ASSET"
+          unzip -l "$ASSET" | grep -E "README|MacOS/Superview Encoder$|ffmpeg/ffmpeg$"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "$ASSET" --clobber
+
+      - name: Keep as workflow artifact (dry runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
