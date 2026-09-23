@@ -31,13 +31,14 @@ jobs:
             ffprobe_url: https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffprobe.zip
             ffprobe_sha: 2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
       ASSET: Superview-Encoder-Mac-${{ matrix.arch }}.zip
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -69,6 +70,9 @@ jobs:
             app.py
 
       - name: Self-test the built app
+        timeout-minutes: 5
+        env:
+          PYWEBVIEW_LOG: debug
         run: |
           APP="dist/Superview Encoder.app/Contents/MacOS/Superview Encoder"
           if ! "$APP" --self-test; then

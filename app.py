@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import webview
@@ -159,12 +160,33 @@ def run_self_test(window, ctl, ffmpeg, ffprobe, workdir):
     return res
 
 
+SELF_TEST_RESULT = os.path.join(tempfile.gettempdir(), "superview-selftest.json")
+SELF_TEST_LIMIT = 180  # seconds before the watchdog gives up; a self-test must never hang CI
+
+
+def write_self_test_result(result):
+    with open(SELF_TEST_RESULT, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    if sys.stdout:
+        print(json.dumps(result, indent=2), flush=True)
+
+
 # ------------------------------------------------------------------ main
 
 def main():
     self_test = "--self-test" in sys.argv
     workdir = tempfile.mkdtemp(prefix="superview-selftest-") if self_test else None
     result = {}
+    started = time.monotonic()
+    if self_test:
+        def watchdog():
+            result.setdefault("ok", False)
+            result.setdefault("error", "self-test timed out after %ds" % SELF_TEST_LIMIT)
+            write_self_test_result(result)
+            os._exit(1)
+        timer = threading.Timer(SELF_TEST_LIMIT, watchdog)
+        timer.daemon = True
+        timer.start()
 
     ffmpeg, ffprobe = engine.find_tools()
     engine.clear_quarantine([ffmpeg, ffprobe])
@@ -195,9 +217,24 @@ def main():
         ctl.shutdown()
 
     def on_start():
+        if self_test:
+            # pywebview's own DOM helpers give up after 15s; slow CI VMs can need longer
+            loaded = window.events.loaded.wait(90)
+            result["load_seconds"] = round(time.monotonic() - started, 1)
+            if not loaded:
+                result.update(ok=False, error="window never finished loading (90s)")
+                window.destroy()
+                return
         dark_title_bar(window)
-        window.dom.document.events.dragover += DOMEventHandler(lambda e: None, True, True)
-        window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
+        try:
+            window.dom.document.events.dragover += DOMEventHandler(lambda e: None, True, True)
+            window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
+        except Exception as e:
+            if not self_test:
+                raise
+            result.update(ok=False, error="drag-and-drop setup failed: %r" % e)
+            window.destroy()
+            return
         ctl.start()
         if ffmpeg is None:
             ctl.error = "ffmpeg is missing from this copy of the app. Re-download it."
@@ -211,13 +248,10 @@ def main():
     webview.start(on_start, icon=None if IS_MAC else resource("assets", "icon.ico"))
 
     if self_test:
-        out = os.path.join(tempfile.gettempdir(), "superview-selftest.json")
-        with open(out, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2)
-        if sys.stdout:
-            print(json.dumps(result, indent=2))
+        result.setdefault("ok", False)
+        write_self_test_result(result)
         ctl.shutdown()
-        sys.exit(0 if result.get("ok") else 1)
+        sys.exit(0 if result["ok"] else 1)
 
 
 if __name__ == "__main__":

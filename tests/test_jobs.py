@@ -176,3 +176,23 @@ def test_snapshot_meta_and_current(make, tmp_path):
     assert s["items"][0]["speed"] == 2.0
     assert s["encoder"] == {"label": "NVIDIA HEVC", "gpu": True}
     gate.set()
+
+
+def test_stale_folder_error_cleared_when_new_folder_works(make, tmp_path):
+    """User picks a good folder while the worker is still checking the bad one:
+    the "can't write" warning must not stick once conversions resume."""
+    c = make()
+    real_check = c._output_ok
+
+    def racing_check(d):
+        if d.endswith("bad"):
+            c.set_output_dir(str(tmp_path / "ok"))   # the user fixes it mid-check
+            return False
+        return real_check(d)
+
+    c._output_ok = racing_check
+    c.set_output_dir(str(tmp_path / "bad"))
+    c.add_paths([src(tmp_path, "a.mp4")])
+    c.start()
+    wait_until(lambda: status(c) == ["done"])
+    assert c.snapshot()["error"] is None

@@ -172,6 +172,10 @@ class Controller:
                     self.error = "Can't write to %s. Choose another folder." % out_dir
                 self._notify(force=True)
                 item = None
+            elif item is not None and self.error:
+                with self._lock:  # the folder works now; drop a warning left over from an older check
+                    self.error = None
+                self._notify(force=True)
             if item is None:
                 self._wake.wait()
                 self._wake.clear()
