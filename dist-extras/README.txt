@@ -1,5 +1,5 @@
 SUPERVIEW ENCODER
-Stretches 4:3 action-cam video (GoPro, DJI) to 16:9, GoPro "SuperView" style:
+Stretches 4:3 DVR video to 16:9, GoPro "SuperView" style:
 the middle stays natural, the edges take the stretch.
 
 HOW TO USE
