@@ -1,0 +1,8 @@
+Superview Encoder
+
+SuperView stretch formula: Niek van der Maas, "superview" (https://github.com/Niek/superview).
+Video engine: FFmpeg (https://ffmpeg.org), Windows build by Gyan Doshi (https://www.gyan.dev/ffmpeg/builds/).
+  FFmpeg is licensed under the GPL v3 -- see ffmpeg-LICENSE.txt.
+  Corresponding source: https://github.com/GyanD/codexffmpeg and https://ffmpeg.org/download.html
+Fonts: Saira Condensed, Public Sans, Spline Sans Mono -- SIL Open Font License 1.1 (OFL-*.txt).
+Window: pywebview (BSD-3-Clause), running on Microsoft Edge WebView2.
