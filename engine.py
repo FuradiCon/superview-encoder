@@ -19,13 +19,19 @@ import threading
 from dataclasses import dataclass
 
 VIDEO_EXTS = (".mp4", ".mov")
-CREATE_NO_WINDOW = 0x08000000  # keep ffmpeg from flashing console windows
+IS_WIN = sys.platform == "win32"
+IS_MAC = sys.platform == "darwin"
+NO_WINDOW = 0x08000000 if IS_WIN else 0  # CREATE_NO_WINDOW: no console flashes on Windows
+
+
+def tool_name(name, platform=sys.platform):
+    return name + ".exe" if platform == "win32" else name
 
 
 def _run(args):
     return subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
                           errors="replace", stdin=subprocess.DEVNULL,
-                          creationflags=CREATE_NO_WINDOW)
+                          creationflags=NO_WINDOW)
 
 
 # ------------------------------------------------------------------ tools
@@ -36,24 +42,43 @@ def _candidate_dirs():
     if getattr(sys, "frozen", False):
         dirs.append(os.path.join(sys._MEIPASS, "ffmpeg"))
     dirs.append(os.path.join(here, "ffmpeg"))
-    dirs += sorted(glob.glob(os.path.join(
-        os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages",
-        "Gyan.FFmpeg*", "ffmpeg-*", "bin")), reverse=True)
+    if IS_WIN:
+        dirs += sorted(glob.glob(os.path.join(
+            os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages",
+            "Gyan.FFmpeg*", "ffmpeg-*", "bin")), reverse=True)
     return dirs
 
 
 def find_tools():
-    """(ffmpeg, ffprobe) paths, or (None, None). Skips System32, which on this
-    machine holds a 2019 ffmpeg too old for current NVIDIA drivers."""
+    """(ffmpeg, ffprobe) paths, or (None, None). On Windows, skips System32,
+    which on the dev machine holds a 2019 ffmpeg too old for current NVIDIA drivers."""
     for d in _candidate_dirs():
-        f, p = os.path.join(d, "ffmpeg.exe"), os.path.join(d, "ffprobe.exe")
+        f, p = os.path.join(d, tool_name("ffmpeg")), os.path.join(d, tool_name("ffprobe"))
         if os.path.isfile(f) and os.path.isfile(p):
             return f, p
     f, p = shutil.which("ffmpeg"), shutil.which("ffprobe")
-    sys32 = os.path.normcase(os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32"))
-    if f and p and os.path.normcase(os.path.dirname(f)) != sys32:
-        return f, p
-    return None, None
+    if not (f and p):
+        return None, None
+    if IS_WIN:
+        sys32 = os.path.normcase(os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32"))
+        if os.path.normcase(os.path.dirname(f)) == sys32:
+            return None, None
+    return f, p
+
+
+def clear_quarantine(paths):
+    """macOS marks every file from a downloaded zip as quarantined; once the user
+    has approved the app, it may lift that mark from its own bundled binaries so
+    Gatekeeper doesn't block ffmpeg separately. Best effort, errors ignored."""
+    if not IS_MAC:
+        return
+    for p in paths:
+        if p:
+            try:
+                subprocess.run(["xattr", "-d", "com.apple.quarantine", p],
+                               capture_output=True, stdin=subprocess.DEVNULL)
+            except OSError:
+                pass
 
 
 # ------------------------------------------------------------------ probe / plan
@@ -161,12 +186,14 @@ class Encoder:
     ten_bit: bool
 
 
-CANDIDATES = [
-    ("hevc_nvenc", "NVIDIA HEVC", True),
-    ("hevc_qsv", "Intel HEVC", True),
-    ("hevc_amf", "AMD HEVC", True),
-    ("libx265", "CPU HEVC", False),
-]
+def candidates_for(platform):
+    if platform == "darwin":
+        return [("hevc_videotoolbox", "Apple HEVC", True), ("libx265", "CPU HEVC", False)]
+    return [("hevc_nvenc", "NVIDIA HEVC", True), ("hevc_qsv", "Intel HEVC", True),
+            ("hevc_amf", "AMD HEVC", True), ("libx265", "CPU HEVC", False)]
+
+
+CANDIDATES = candidates_for(sys.platform)
 
 
 def _test_encode(ffmpeg, name, pix_fmt):
@@ -183,6 +210,15 @@ def detect_encoder(ffmpeg, candidates=CANDIDATES):
         if _test_encode(ffmpeg, name, "nv12" if gpu else "yuv420p"):
             return Encoder(name, label, gpu, False)
     return None
+
+
+def make_test_clip(ffmpeg, path, w=1440, h=1080, secs=2):
+    """A small 4:3 clip for the app's --self-test."""
+    subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                    "-i", "testsrc2=s=%dx%d:d=%d:r=30" % (w, h, secs),
+                    "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error",
+                    "-pix_fmt", "yuv420p", path],
+                   check=True, capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
 
 
 def pix_fmt_for(enc, ten_bit_src):
@@ -202,6 +238,8 @@ def encoder_args(enc, bitrate):
     if enc.name == "hevc_amf":
         return ["-c:v", "hevc_amf", "-quality", "quality", "-rc", "vbr_peak",
                 "-b:v", b, "-maxrate", peak]
+    if enc.name == "hevc_videotoolbox":
+        return ["-c:v", "hevc_videotoolbox", "-b:v", b, "-maxrate", peak]
     return ["-c:v", "libx265", "-preset", "medium", "-b:v", b, "-x265-params", "log-level=error"]
 
 
@@ -243,7 +281,7 @@ def convert(ffmpeg, job, enc, on_progress=None, cancel=None):
         proc = subprocess.Popen(build_command(ffmpeg, job, enc, xmap, ymap, part),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 stdin=subprocess.DEVNULL, text=True, encoding="utf-8",
-                                errors="replace", creationflags=CREATE_NO_WINDOW)
+                                errors="replace", creationflags=NO_WINDOW)
         err_lines = []
         reader = threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True)
         reader.start()
