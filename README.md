@@ -4,6 +4,14 @@ Stretch 4:3 action-cam footage (GoPro, DJI) to 16:9, GoPro "SuperView" style: th
 middle of the frame stays natural and the edges take the stretch. Drag videos in from
 any folder, and they're converted on your graphics card at the original quality.
 
+![Before and after: a 4:3 DJI frame and the same frame stretched to 16:9](docs/before-after.jpg)
+
+Action cams shoot 4:3 to capture as much as possible, but screens and YouTube are 16:9. A plain
+stretch makes everything look fat, and cropping throws away the top and bottom. SuperView stretches
+unevenly instead. The center of the frame, where you're usually looking, stays at its true shape,
+and the stretch ramps up toward the left and right edges, where it adds to the sense of speed.
+The grid in the bottom row shows it: the middle squares stay square and the outer ones get wider.
+
 ![Superview Encoder](docs/screenshot.png)
 
 ## Download
