@@ -16,7 +16,8 @@ def test_output_size_rounds_width_to_even():
 
 
 def test_output_path(tmp_path):
-    assert engine.output_path(r"D:\clips\DJI_1.MP4", str(tmp_path)) == os.path.join(str(tmp_path), "superview_DJI_1.mp4")
+    src = os.path.join("clips", "DJI_1.MP4")
+    assert engine.output_path(src, str(tmp_path)) == os.path.join(str(tmp_path), "superview_DJI_1.mp4")
 
 
 def test_plan_job_ok(tmp_path):
@@ -49,22 +50,25 @@ def test_maps_match_superview_v02(tmp_path):
     assert struct.unpack(">H", ybody[-2:])[0] == 2015
 
 
+WIN = engine.candidates_for("win32")   # fixed list, so these pass on the Mac runners too
+
+
 def test_detect_encoder_order(monkeypatch):
     works = {("hevc_amf", "nv12")}
     monkeypatch.setattr(engine, "_test_encode", lambda ff, name, pix: (name, pix) in works)
-    enc = engine.detect_encoder("ffmpeg")
+    enc = engine.detect_encoder("ffmpeg", WIN)
     assert (enc.name, enc.gpu, enc.ten_bit) == ("hevc_amf", True, False)
 
 
 def test_detect_encoder_prefers_nvenc_10bit(monkeypatch):
     monkeypatch.setattr(engine, "_test_encode", lambda ff, name, pix: True)
-    enc = engine.detect_encoder("ffmpeg")
+    enc = engine.detect_encoder("ffmpeg", WIN)
     assert (enc.name, enc.label, enc.ten_bit) == ("hevc_nvenc", "NVIDIA HEVC", True)
 
 
 def test_detect_encoder_none(monkeypatch):
     monkeypatch.setattr(engine, "_test_encode", lambda ff, name, pix: False)
-    assert engine.detect_encoder("ffmpeg") is None
+    assert engine.detect_encoder("ffmpeg", WIN) is None
 
 
 def test_pix_fmt_for():
