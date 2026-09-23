@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Superview Encoder</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <header class="head">
+    <div>
+      <p class="eyebrow">4:3 → 16:9 · SuperView stretch</p>
+      <h1>Superview Encoder</h1>
+    </div>
+    <div class="enc-chip" id="enc"><span class="dot"></span><b>…</b><span id="enc-label">detecting encoder</span></div>
+  </header>
+
+  <section class="drop" id="drop">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke-width="1.4" aria-hidden="true">
+      <rect x="1" y="7" width="32" height="24" stroke="rgba(244,244,244,.32)"/>
+      <path d="M17 1v17M11 12l6 6 6-6" stroke="#FF5A00"/>
+      <path d="M7 26h20" stroke="rgba(244,244,244,.32)"/>
+    </svg>
+    <div>
+      <div class="drop-title">Drop videos or folders here</div>
+      <div class="drop-sub">from any folder · or <button class="link" id="browse">browse…</button></div>
+    </div>
+  </section>
+
+  <section class="now" id="now" hidden>
+    <p class="label" id="now-label">Converting</p>
+    <div class="now-grid">
+      <div>
+        <div class="now-name" id="now-name"></div>
+        <div class="meta" id="now-meta"></div>
+      </div>
+      <div class="pct" id="now-pct">0%</div>
+      <div class="bar"><i id="now-bar"></i></div>
+      <div class="now-foot"><span id="now-eta"></span><button class="btn danger" id="cancel">Cancel</button></div>
+    </div>
+  </section>
+
+  <section class="queue">
+    <div class="q-head">
+      <p class="label" id="q-label">Queue · 0</p>
+      <button class="q-clear" id="clear">Clear finished</button>
+    </div>
+    <div class="q-list" id="list"></div>
+  </section>
+
+  <footer class="foot">
+    <p class="label">Save to</p>
+    <div class="path" id="path"></div>
+    <button class="btn" id="change">Change…</button>
+    <button class="btn" id="open">Open folder</button>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
