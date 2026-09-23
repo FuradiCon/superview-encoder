@@ -14,6 +14,8 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
+import threading
 from dataclasses import dataclass
 
 VIDEO_EXTS = (".mp4", ".mov")
@@ -216,3 +218,68 @@ def build_command(ffmpeg, job, enc, xmap, ymap, part):
     cmd += encoder_args(enc, job.bitrate)
     cmd += ["-tag:v", "hvc1", "-map_metadata", "0", "-movflags", "+faststart", part]
     return cmd
+
+
+# ------------------------------------------------------------------ convert
+
+class Cancelled(Exception):
+    pass
+
+
+class ConvertError(Exception):
+    pass
+
+
+def convert(ffmpeg, job, enc, on_progress=None, cancel=None):
+    """Run one conversion. Blocks. Raises Cancelled or ConvertError; never
+    leaves a partial output behind."""
+    os.makedirs(os.path.dirname(job.dst), exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix="superview_")
+    xmap, ymap = os.path.join(tmp, "x.pgm"), os.path.join(tmp, "y.pgm")
+    part = job.dst[:-4] + ".part.mp4"
+    proc = None
+    try:
+        write_maps(job.in_w, job.out_w, job.out_h, xmap, ymap)
+        proc = subprocess.Popen(build_command(ffmpeg, job, enc, xmap, ymap, part),
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                stdin=subprocess.DEVNULL, text=True, encoding="utf-8",
+                                errors="replace", creationflags=CREATE_NO_WINDOW)
+        err_lines = []
+        reader = threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True)
+        reader.start()
+        if cancel is not None:
+            def watch():
+                while proc.poll() is None:
+                    if cancel.wait(0.2):
+                        proc.kill()
+                        return
+            threading.Thread(target=watch, daemon=True).start()
+
+        frac, speed = 0.0, None
+        for line in proc.stdout:
+            key, _, val = line.strip().partition("=")
+            if key == "out_time_us" and val.isdigit() and job.duration > 0:
+                frac = min(int(val) / 1e6 / job.duration, 1.0)
+            elif key == "speed" and val.endswith("x"):
+                try:
+                    speed = float(val[:-1])
+                except ValueError:
+                    pass
+            elif key == "progress" and on_progress:
+                on_progress(1.0 if val == "end" else frac, speed)
+        proc.wait()
+        reader.join(timeout=5)
+
+        if cancel is not None and cancel.is_set():
+            raise Cancelled()
+        if proc.returncode != 0:
+            msg = "".join(err_lines[-20:]).strip()
+            raise ConvertError(msg or "ffmpeg exited with code %d" % proc.returncode)
+        os.replace(part, job.dst)
+    finally:
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        if os.path.exists(part):
+            os.remove(part)
+        shutil.rmtree(tmp, ignore_errors=True)
