@@ -7,15 +7,24 @@ window and pushes snapshot() to the page whenever on_change fires.
 import itertools
 import json
 import os
+import sys
 import tempfile
 import threading
 import time
 
 import engine
 
-APP_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Superview Encoder")
-SETTINGS_PATH = os.path.join(APP_DIR, "settings.json")
-DEFAULT_OUT = os.path.join(os.path.expanduser("~"), "Videos", "Superview")
+
+def default_paths(platform, home, appdata):
+    """(default output folder, settings.json path) for this OS."""
+    if platform == "darwin":
+        return (os.path.join(home, "Movies", "Superview"),
+                os.path.join(home, "Library", "Application Support", "Superview Encoder", "settings.json"))
+    return (os.path.join(home, "Videos", "Superview"),
+            os.path.join(appdata or home, "Superview Encoder", "settings.json"))
+
+
+DEFAULT_OUT, SETTINGS_PATH = default_paths(sys.platform, os.path.expanduser("~"), os.environ.get("APPDATA"))
 FINISHED = ("done", "skipped", "failed", "cancelled")
 
 
