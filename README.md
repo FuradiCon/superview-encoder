@@ -8,21 +8,40 @@ any folder, and they're converted on your graphics card at the original quality.
 
 ## Download
 
-**[⬇ Download Superview Encoder for Windows](https://github.com/FuradiCon/superview-encoder/releases/latest/download/Superview-Encoder.zip)** (about 88 MB, Windows 10/11)
+| | Download |
+|---|---|
+| **Windows** 10/11 | [Superview-Encoder.zip](https://github.com/FuradiCon/superview-encoder/releases/latest/download/Superview-Encoder.zip) |
+| **Mac, Apple Silicon** (M1 and later) | [Superview-Encoder-Mac-AppleSilicon.zip](https://github.com/FuradiCon/superview-encoder/releases/latest/download/Superview-Encoder-Mac-AppleSilicon.zip) |
+| **Mac, Intel** | [Superview-Encoder-Mac-Intel.zip](https://github.com/FuradiCon/superview-encoder/releases/latest/download/Superview-Encoder-Mac-Intel.zip) |
+
+Not sure which Mac you have? Go to Apple menu → About This Mac. The "Chip" line says Apple M-something (Apple Silicon) or Intel.
+
+### Windows first launch
 
 1. Unzip the whole folder somewhere and keep the files together.
-2. Double-click `Superview Encoder.exe`.
+2. Double-click `Superview Encoder.exe`. The app isn't code-signed, so Windows shows a blue
+   "Windows protected your PC" screen. Click **More info**, then **Run anyway**. You only do this once.
 3. Drag videos or folders onto the window. Converted files land in `Videos\Superview`,
    or in whichever folder you pick with **Change…**.
 
-**First run:** the app isn't code-signed, so Windows shows a blue "Windows protected your PC"
-screen. Click **More info**, then **Run anyway**. You only need to do this once.
+### Mac first launch
+
+1. Unzip, then **drag `Superview Encoder` into Applications**. Don't run it from Downloads.
+2. Open it. macOS says it can't verify the app, because it isn't signed with a paid Apple developer
+   account. Click **Done**.
+3. Go to **System Settings → Privacy & Security**, scroll down, click **Open Anyway**, and enter your
+   password. After that it opens normally.
+4. Still blocked? Paste this into Terminal: `xattr -cr "/Applications/Superview Encoder.app"`
+
+Converted files land in `Movies/Superview`. The Mac builds are built and self-tested automatically on
+GitHub's Macs but haven't been clicked through by a person yet. If something's off, please
+[open an issue](https://github.com/FuradiCon/superview-encoder/issues).
 
 ## What it does
 
 - Uses the SuperView stretch formula from [Niek/superview](https://github.com/Niek/superview),
   byte for byte, and fixes its crash on DJI files, which carry a hidden preview video stream.
-- Encodes to HEVC on NVIDIA, Intel, or AMD GPUs, and falls back to the CPU (slow) if none is available.
+- Encodes to HEVC on the GPU: NVIDIA, Intel, or AMD on Windows, and Apple VideoToolbox on Mac. It falls back to the CPU (slow) when no GPU encoder is available.
 - Keeps 10-bit color and matches the source bitrate. There are no quality settings to fiddle with.
 - Queues files one at a time. You can cancel, and failed files show ffmpeg's actual error.
 
