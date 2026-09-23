@@ -217,9 +217,11 @@ def main():
         ctl.shutdown()
 
     def on_start():
+        # pywebview's DOM helpers give up after 15s, and a slow Mac can take longer than
+        # that to load the page (GitHub's Intel VM took ~39s) -- which would silently
+        # lose drag and drop. So wait patiently before touching the DOM.
+        loaded = window.events.loaded.wait(90)
         if self_test:
-            # pywebview's own DOM helpers give up after 15s; slow CI VMs can need longer
-            loaded = window.events.loaded.wait(90)
             result["load_seconds"] = round(time.monotonic() - started, 1)
             if not loaded:
                 result.update(ok=False, error="window never finished loading (90s)")
