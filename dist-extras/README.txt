@@ -12,6 +12,13 @@ FIRST RUN: "Windows protected your PC"
 The app isn't code-signed, so Windows shows a blue warning the first time.
 Click "More info", then "Run anyway". You only have to do this once.
 
+WINDOWS 11: SMART APP CONTROL
+If Smart App Control is On (or in Evaluation mode), Windows blocks this app
+with no "Run anyway" option. To run it, turn it off: Windows Security ->
+App & browser control -> Smart App Control settings -> Off.
+Heads-up: on many Windows 11 versions it can't be turned back on without
+resetting Windows. Defender antivirus keeps working either way.
+
 GOOD TO KNOW
 - Uses your graphics card (NVIDIA, Intel or AMD) when it can. If the top-right
   chip says "CPU - SLOW", it's working, just much slower.

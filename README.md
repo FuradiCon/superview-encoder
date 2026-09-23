@@ -24,6 +24,17 @@ Not sure which Mac you have? Go to Apple menu → About This Mac. The "Chip" lin
 3. Drag videos or folders onto the window. Converted files land in `Videos\Superview`,
    or in whichever folder you pick with **Change…**.
 
+> [!WARNING]
+> **Windows 11 with Smart App Control:** if Smart App Control is **On** (or in **Evaluation** mode),
+> Windows blocks unsigned apps like this one outright, with no "Run anyway" button. The only way to run
+> it is to turn Smart App Control off: **Windows Security → App & browser control → Smart App Control
+> settings → Off**.
+>
+> Before you do, know that on many Windows 11 versions **Smart App Control can't be switched back on
+> without resetting or reinstalling Windows**. It's your call. Other protection like Microsoft Defender
+> antivirus keeps working either way. If yours is already off, or you're on Windows 10, skip this and
+> just use the "Run anyway" step above.
+
 ### Mac first launch
 
 1. Unzip, then **drag `Superview Encoder` into Applications**. Don't run it from Downloads.
